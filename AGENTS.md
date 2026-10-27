@@ -110,3 +110,32 @@ This magpie-side code still runs for moved subscriptions:
 
 The parity tests, `internal/gateway/plugin_*_test.go`, hold each plugin to
 what its built-in did.
+
+## Cursor Cloud specific instructions
+
+Linux `make test` and `make build` need GTK 3 and WebKitGTK 4.1
+(`libgtk-3-dev`, `libwebkit2gtk-4.1-dev`). The Makefile adds `gtk3` to the
+`production` build tag on Linux. `make cli` is the cgo-free terminal build
+(`-tags nogui`). Plugin host tests need Bun 1.4.2, the version in
+`.github/workflows/test.yml`.
+
+`make dev` reloads the UI from `internal/gui/assets` on `127.0.0.1:3426`
+(dev UI `127.0.0.1:3427`) when `fswatch` is installed; otherwise it runs
+`dev-once`. `magpie web --no-open`, or `magpie serve --web`, serves the
+browser app at `127.0.0.1:3430` beside the gateway on `127.0.0.1:3425`.
+`MAGPIE_WEB_KEY` keeps that page link stable. `GET /api/hello` and
+`magpie healthcheck` answer while the gateway is up.
+
+Site checks, from `.github/workflows/test.yml`: `sh -n site/public/install.sh`
+and `node --test site/*.test.mjs`.
+
+This VM's inode timestamps move only about every 4ms. `proc`'s directory
+listing cache treats an unchanged mtime as unchanged contents, so a test
+that creates a command in a temp `PATH` and looks it up in the same tick
+fails even though the file is there (`internal/agent` tests such as
+`TestInstalledVersion` and `TestZedAppPath`). That is the kernel clock, not
+a missing package. `TestFontDPIUnset` runs when `DISPLAY` is set; the
+Cloud Agent desktop's X cookie is `~/.Xauthority`, and the probe still
+sees this screen's gtk-xft-dpi (95) rather than the 96 an empty Xvfb has.
+`go vet -tags "production gtk3" ./...` is the check that the GUI toolchain
+compiled.
