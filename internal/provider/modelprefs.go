@@ -467,6 +467,66 @@ func setModelAPI(ref, api string) (bool, error) {
 	return true, nil
 }
 
+// normalizedOutbound is Outbound saved in one of the four APIs, or ""
+// when it names nothing or the provider has no URL for it. auto and
+// default are empty; openai is chat.
+func (p Provider) normalizedOutbound() string {
+	v := strings.ToLower(strings.TrimSpace(p.Outbound))
+	switch v {
+	case "", "auto", "default":
+		return ""
+	case "openai":
+		v = string(Chat)
+	}
+	proto := Protocol(v)
+	if !modelAPI(proto) || p.Base(proto) == "" {
+		return ""
+	}
+	return string(proto)
+}
+
+// ApplyOutbound sets p's outbound API from v. auto and default clear it.
+// openai is chat. A value that is not one of those, or a protocol p has
+// no URL for, is an error and p is left as it was.
+func ApplyOutbound(p *Provider, v string) error {
+	raw := strings.ToLower(strings.TrimSpace(v))
+	switch raw {
+	case "", "auto", "default":
+		p.Outbound = ""
+		return nil
+	case "openai":
+		raw = string(Chat)
+	}
+	proto := Protocol(raw)
+	if !modelAPI(proto) {
+		return fmt.Errorf("outbound is auto, chat, responses, anthropic or gemini, not %q", v)
+	}
+	if p.Base(proto) == "" {
+		return fmt.Errorf("%s has no %s URL to leave on", p.Name, proto)
+	}
+	p.Outbound = string(proto)
+	return nil
+}
+
+// LeavesAs is the API a request to p's model leaves on when the user
+// pinned one, and whether that pin is in force. A subscription account
+// is never pinned. With no outbound pin, ModelAPI keeps its old meaning
+// and this reports nothing. A model's own API wins over the provider's
+// pin when that API still has a URL.
+func (p Provider) LeavesAs(model string) (Protocol, bool) {
+	if p.Account != nil || strings.TrimSpace(p.Outbound) == "" {
+		return "", false
+	}
+	if proto, ok := p.ModelAPI(model); ok {
+		return proto, true
+	}
+	proto := Protocol(p.Outbound)
+	if !modelAPI(proto) || p.Base(proto) == "" {
+		return "", false
+	}
+	return proto, true
+}
+
 // ModelAPI is the API the user said p's model is asked on, when p has a
 // URL for it still.
 func (p Provider) ModelAPI(model string) (Protocol, bool) {

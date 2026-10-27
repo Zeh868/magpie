@@ -104,6 +104,12 @@ type Provider struct {
 	// first API with a URL (01huadalang: Responses picked and saved came
 	// back as OpenAI compatible). Requests go by which URLs are set.
 	BaseAPI string `json:"baseAPI,omitempty"`
+	// Outbound is the API requests to this provider leave on, when the
+	// user pinned one: "chat", "responses", "anthropic" or "gemini".
+	// Empty keeps today's choice (usable). A subscription account ignores
+	// it (LeavesAs). Same-protocol traffic is then forwarded with only
+	// the model name and key changed.
+	Outbound string `json:"outbound,omitempty"`
 
 	// Fallback is where a request goes when this provider can't take it —
 	// out of quota, rate limited, overloaded or down — before any of the
@@ -1423,6 +1429,7 @@ func normalize(p Provider) Provider {
 			}
 		}
 	}
+	p.Outbound = p.normalizedOutbound()
 	return p
 }
 

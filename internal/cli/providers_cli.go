@@ -39,6 +39,9 @@ const providerUsage = `usage:
                                           user-agent=agent sends the User-Agent the agent gave (pi, opencode…)
                                           in place of magpie's, for a plan that serves only agents it names;
                                           user-agent=magpie, the default, sends magpie's;
+                                          outbound=chat|responses|anthropic|gemini pins the API requests leave on
+                                          (auto, the default, keeps today's choice; the same API forwards the body
+                                          with only the model name and key changed);
                                           compaction=native asks the provider Codex's own compaction and hands
                                           Codex its sealed item as it came (a Responses API, a ChatGPT account,
                                           Copilot), compaction=magpie, the default, has magpie summarise
@@ -1147,6 +1150,10 @@ func applyPairs(p *provider.Provider, pairs []string) error {
 				return fmt.Errorf("%s signs in as its own client, which sends the User-Agent it does; user-agent= is for a provider with an API key", p.Name)
 			}
 			p.PassUserAgent = on
+		case "outbound":
+			if err := provider.ApplyOutbound(p, v); err != nil {
+				return err
+			}
 		case "search":
 			// yes: the vendor searches the web by itself, a web search a
 			// client offers going to it as it was sent (a relay in front of

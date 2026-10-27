@@ -89,6 +89,8 @@ type providerJSON struct {
 	ExtraBody provider.ExtraBody `json:"extraBody,omitempty"`
 	// the API the user gave a custom provider's Base URL as (BaseAPI)
 	BaseAPI string `json:"baseAPI,omitempty"`
+	// Outbound is the API requests to this provider leave on (provider.Outbound)
+	Outbound string `json:"outbound,omitempty"`
 	// the vendor searches the web by itself (provider.Searches)
 	Searches bool `json:"searches"`
 	// on the Cline API: its DeepSeek models are served by DeepSeek's own
@@ -595,7 +597,7 @@ func providerInfo(p provider.Provider, agents []agentUse) providerJSON {
 func providerInfoWith(p provider.Provider, agents []agentUse, desktop map[string]string) providerJSON {
 	out := providerJSON{
 		ID: p.ID, Name: p.Name, Icon: p.Icon, Preset: p.Preset, Host: p.Host(),
-		Chat: p.Chat, Responses: p.Responses, Anthropic: p.Anthropic, Gemini: p.Gemini, Decide: p.Decide, BaseAPI: p.BaseAPI, ModelTest: p.ModelTest(), TestsAs: p.TestClients(), DecideTest: p.AsksDecideModels(), MarksKinds: p.MarksKinds(),
+		Chat: p.Chat, Responses: p.Responses, Anthropic: p.Anthropic, Gemini: p.Gemini, Decide: p.Decide, BaseAPI: p.BaseAPI, Outbound: p.Outbound, ModelTest: p.ModelTest(), TestsAs: p.TestClients(), DecideTest: p.AsksDecideModels(), MarksKinds: p.MarksKinds(),
 		Catalog: p.Catalog, Website: p.Website, KeysURL: p.KeysURL,
 		Proxy: p.Proxy, AccountProxies: p.AccountProxies, AccountModels: p.AccountModels, AccountCaps: p.AccountCaps, AccountWindowCaps: p.AccountWindowCaps, AccountNames: p.AccountNames, Headers: p.Headers, ExtraBody: p.ExtraBody, Searches: p.Searches, Cline: p.ClinePinnable(), PinUpstream: p.PinUpstream, Unredacted: p.Unredacted, InsecureTLS: p.InsecureTLS, TakesInsecureTLS: p.TakesInsecureTLS(), LimitRestOff: p.LimitRestOff, NativeCompaction: p.NativeCompaction, CarriesCompaction: p.CarriesCompaction(), PassUserAgent: p.PassUserAgent, OwnClient: p.OwnClient(), AuthHeader: p.AuthHeader, BothAuth: p.BothAuth(), BalanceURL: p.BalanceURL, BalancePath: p.BalancePath, BalanceMethod: p.BalanceMethod, ModelsURL: p.ModelsURL,
 		Ready: p.Ready(), Chosen: p.Picks(), Models: []modelJSON{}, Agents: []providerAgent{},
@@ -1245,6 +1247,10 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			// third-party Anthropic API (provider.Provider.AuthHeader); a
 			// save that leaves it out keeps it, one learned too
 			AuthHeader *string `json:"authHeader"`
+			// Outbound, for save: the API requests leave on
+			// (provider.Provider.Outbound). A save that leaves it out keeps
+			// it. "" is automatic.
+			Outbound *string `json:"outbound"`
 			// Test, for test: models to send a request each, in place of
 			// one per endpoint
 			Test []string `json:"test"`
@@ -1304,6 +1310,9 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 		}
 		if req.AuthHeader != nil {
 			in.AuthHeader = *req.AuthHeader
+		}
+		if req.Outbound != nil {
+			in.Outbound = *req.Outbound
 		}
 		var moved []agent.Move
 		switch r.PathValue("action") {
@@ -1390,6 +1399,7 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 				pr.NativeCompaction = in.NativeCompaction
 				pr.PassUserAgent = in.PassUserAgent
 				pr.AuthHeader = in.AuthHeader
+				pr.Outbound = in.Outbound
 				// and what its editor sets beside them: how requests spread
 				// over its keys, how long a conversation stays, the one
 				// rate limited to the back, Unlisted and each key's proxy.
@@ -1643,6 +1653,9 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 					}
 					if req.AuthHeader == nil {
 						in.AuthHeader = old.AuthHeader
+					}
+					if req.Outbound == nil {
+						in.Outbound = old.Outbound
 					}
 					// its list's schedule and rules are set on their own, from
 					// the CLI (#2135)

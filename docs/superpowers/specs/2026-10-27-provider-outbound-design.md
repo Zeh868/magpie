@@ -2,7 +2,7 @@
 
 日期：2026-10-27
 
-状态：待实现。本文描述提案，不是当前行为。当前选路见 [Gateway routing and fallback](../../subsystems/gateway-routing.md)。
+状态：已实现。当前行为见 [Gateway routing and fallback](../../subsystems/gateway-routing.md) 的 Outbound protocol。
 
 ## 目标
 

@@ -3839,6 +3839,20 @@ func sinceStart(before, d time.Duration) int64 {
 // attempt sends a request to one provider. call.To stays empty when the
 // provider has no endpoint to send it to.
 func (s *Server) attempt(w http.ResponseWriter, r *http.Request, from provider.Protocol, p provider.Provider, model string, body []byte, call *Call) (int, string) {
+	// A pinned outbound API (LeavesAs) leaves before the rewrites below.
+	// The same API is forwarded with only the model name and key changed.
+	// Another is translated to that one API. Empty pin, and every
+	// subscription account, keep the path that follows.
+	if to, ok := p.LeavesAs(model); ok {
+		r = r.WithContext(p.Via(r.Context()))
+		noteMember(w, r, p, model)
+		if to == from {
+			call.To = to
+			return s.directForward(w, r, p, to, model, body, &call.Usage)
+		}
+		call.To = to
+		return s.translate(w, r, p, from, to, model, body, &call.Usage)
+	}
 	// Normalize for the actual destination, separately on each fallback.
 	// Native ChatGPT accounts accept standalone tool outputs themselves.
 	if from == provider.Responses && (p.Account == nil || p.Account.Agent != "codex") {
@@ -5273,6 +5287,15 @@ func (s *Server) markUnfit(providerID, model string, proto provider.Protocol) {
 // Messages API is served, which alone keeps its cache_control and
 // thinking (#997).
 func (s *Server) usable(p provider.Provider, model string) []provider.Protocol {
+	// A pinned outbound API is the only one asked, until it has turned
+	// the model away. Then nothing else is offered, so Speaks() cannot
+	// loosen the pin.
+	if to, ok := p.LeavesAs(model); ok {
+		if s.fits(p.ID, model, to) {
+			return []provider.Protocol{to}
+		}
+		return nil
+	}
 	apis := p.APIs(model)
 	var out []provider.Protocol
 	for _, proto := range p.Speaks() {
@@ -5770,7 +5793,7 @@ func (s *Server) forwardTranslated(ctx context.Context, p provider.Provider, to 
 		}
 		s.markUnfit(p.ID, model, to)
 		next := s.usable(p, model)
-		if len(next) == 0 {
+		if len(next) == 0 || next[0] == to {
 			return res, to, nil
 		}
 		to, beforeOff = next[0], nil

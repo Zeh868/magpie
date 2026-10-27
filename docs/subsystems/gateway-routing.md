@@ -11,6 +11,41 @@ This page covers how a request is routed. Plugins that change requests and
 replies are in [Gateway middleware](gateway-middleware.md). Subscriptions
 served by a plugin are in [Provider and plugin ownership](provider-plugins.md).
 
+## Outbound protocol
+
+A provider's `outbound` (`Provider.Outbound`, empty by default) pins the
+API its key-backed requests leave on: `chat`, `responses`, `anthropic` or
+`gemini`. Empty leaves today's `usable` order. `LeavesAs` is that pin. A
+subscription account (`Account != nil`) ignores it, so Claude's bridge, the
+ChatGPT backend and a plugin's fetch stay as they are. A routing group's
+members are asked one by one, each with its own pin.
+
+When the pin matches the agent's API, `directForward`
+([`direct.go`](../../internal/gateway/direct.go)) sends the body with only
+the model name replaced (`rewriteModel`) and the provider's key (`Sign`).
+The client's identity headers are copied (`directHeaders`): `User-Agent`,
+`anthropic-version`, `anthropic-beta`, `x-stainless-*`, `x-claude-code-*`,
+and Codex's `originator` and `x-codex-*`. Effort, cache breakpoints, tool
+ids and the rewrites in `forwardOnce` are not applied. `headers` and
+`extraBody` the user set still are. The reply is copied as it arrived.
+`TestOutboundDirectKeepsTheBody`.
+
+When the pin is another API, `translate` builds that one API. `usable`
+returns only the pin until the model is turned away there, and then
+nothing else, so a refusal does not move the request to another of the
+provider's APIs (`TestOutboundChatFromMessages`,
+`TestOutboundGroupUsesEachMembersPin`).
+
+Set with `magpie provider set <id> outbound=`, or the provider editor's
+Outbound protocol. A save that omits the field keeps it
+(`TestOutboundKeptWhenTheSaveOmitsIt`). A value with no URL for that API
+is dropped on save (`normalizedOutbound`). `ApplyOutbound` refuses that
+value from the CLI instead of saving it.
+
+The TLS stack stays Go's. The gateway does not imitate a CLI's handshake.
+
+
+
 WorkBuddy and CodeBuddy Code's `X-Conversation-ID` is a native session header
 in `sessionHeaders` (`sessionOf`, `nativeSessionOf`, `conversationID` in
 [`gateway.go`](../../internal/gateway/gateway.go)). It keeps their requests
